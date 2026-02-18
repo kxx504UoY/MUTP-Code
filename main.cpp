@@ -1,12 +1,14 @@
 #include "mbed.h"
 #include "TextLCD.h"
 
-//------------------------------------------------VARIABLES------------------------------------------------//
-
-TextLCD lcd(D0, D1, D2, D3, D4, D5, TextLCD::LCD20x4); // Connect these nucleo pins to RS, E, D4, D5, D6 and D7 pins of the LCD
+//------------------------------------------------------IO INITIALISATION------------------------------------------------------//
+// Connect these nucleo pins to RS, E, D4, D5, D6 and D7 pins of the LCD
+TextLCD lcd(D0, D1, D2, D3, D4, D5, TextLCD::LCD20x4);
 DigitalOut fowLED(D6), leftLED(D8), righLED(D7), backLED(D9);
 DigitalIn pingButton(D10, PullUp);
+DigitalIn moveButton(D11, PullUp);
 
+//----------------------------------------------------------VARIABLES----------------------------------------------------------//
 //using shorts for memory efficiency
 const short MAP_SIZE = 10; //currently one variable for size - a square map
 const short map[MAP_SIZE][MAP_SIZE]={{1,1,1,1,1,1,1,1,1,1},
@@ -25,7 +27,9 @@ short position[] = {2,3}; //position on map in form {x,y}
 short ping_delay=500;   //the delay between pinging each direction
 short dist_delay=200;   //the delay for every empty space between you and a wall
 
-//------------------------------------------------FUNCTIONS------------------------------------------------//
+short lives=2;  //how many lives player has
+
+//-------------------------------------------------------SONAR FUNCTIONS-------------------------------------------------------//
 
 /* ping
     Send out a ping and light up LEDs if there is a wall detected in foward direction
@@ -91,7 +95,6 @@ short ping(short sonar_orien){
         }
     }
     //if there was no wall detected
-    printf("NO WALL: dir:%i, walldist:%i, maxdist:%i\r\n", direction, wall_dist, max_dist);
     return -1;
 }
 
@@ -154,47 +157,98 @@ void ping_all(){
     flash(righLED, 3);
 
 }
+//------------------------------------------------------MOVEMENT FUNCTIONS------------------------------------------------------//
 
+/* crash
+    if the player tries to move into a wall, this function will be called and remove a life
+    If the player runs out of lives the game is over.
+*/
+void crash(){
+    lives-=1;
+    
+    lcd.cls();
+    lcd.locate(0,0);
+    lcd.printf("CRASHED!!!");
+    lcd.locate(0,1);
 
+    if (lives>0) lcd.printf("Ship Damaged.");
+    else {
+        //game over
+        lcd.printf("Ship Destroyed.");
+        while(true);
+    }
+}
 
+/* go_fowards()
+    a function to detect if theres something in the next space fowards. 
+    If there is, call crash(), otherwise, move the ship into the space.
+*/
+void go_fowards(){
+    //if not a wall in front of me
+    //position[0]+-1 OR position[1] +- 1 depending on direction
+    printf("position (%i,%i)",position[0], position[1]);
+    if(orientation==0){ //if moving east
+        if(map[position[1]][position[0]+1]==1){ //if next space is a wall 
+            crash();
+        }
+        else{
+            position[0]++;
+            lcd.cls();
+            lcd.locate(0,0);
+            lcd.printf("fowards.");
+        }
+    }
+    if(orientation==1){ //if moving south
+        if(map[position[1]+1][position[0]]==1){ //if next space is a wall 
+            crash();
+        }
+        else{
+            position[1]++;
+            lcd.cls();
+            lcd.locate(0,0);
+            lcd.printf("fowards.");
+        }
+    }
+    if(orientation==2){ //if moving west
+        if(map[position[1]][position[0]-1]==1){ //if next space is a wall 
+            crash();
+        }
+        else{ 
+            position[0]--;
+            lcd.cls();
+            lcd.locate(0,0);
+            lcd.printf("fowards.");
+        }
+    }
+    if(orientation==3){ //if moving north
+        if(map[position[1]-1][position[0]]==1){ //if next space is a wall 
+            crash();
+        }
+        else{
+            position[1]--;
+            lcd.cls();
+            lcd.locate(0,0);
+            lcd.printf("fowards.");
+        }
+    }
+}
 
-int main() 
-{
+//-------------------------------------------------------------MAIN-------------------------------------------------------------//
+
+int main(){
     lcd.cls(); //clears the lcd screen
     lcd.locate(0,0); //sets the cursor to column 0 and row 1
     // lcd.printf("Hello World!\n"); //displays the message Hello World on the LCD
 
     while(true){
         if(pingButton == false){    //on press
+            lcd.cls();
             ping_all();
         }
+        if(moveButton == false){    //on press
+            thread_sleep_for(ping_delay);
+            go_fowards();
 
+        }
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    // lcd.locate(0,1); //set cursor on row number 1 (bottom row)
-    // lcd.printf("The value is %d", 25); //displays an integer value
