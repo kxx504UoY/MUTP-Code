@@ -6,6 +6,7 @@ Features:
 - Foward movement
 - crashing
 - lives and end-of-game condition
+- Rotation (via one button)
 
 Yet to include:
 - Move backwards?
