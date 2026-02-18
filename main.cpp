@@ -4,18 +4,19 @@
 //------------------------------------------------------IO INITIALISATION------------------------------------------------------//
 // Connect these nucleo pins to RS, E, D4, D5, D6 and D7 pins of the LCD
 TextLCD lcd(D0, D1, D2, D3, D4, D5, TextLCD::LCD20x4);
-DigitalOut fowLED(D6), leftLED(D8), righLED(D7), backLED(D9);
+DigitalOut fowLED(D6), leftLED(D8), righLED(D7), backLED(D9); //scanLED(D12);
 DigitalIn pingButton(D10, PullUp);
 DigitalIn moveButton(D11, PullUp);
+DigitalIn rotateButton(D12, PullUp);
 
 //----------------------------------------------------------VARIABLES----------------------------------------------------------//
 //using shorts for memory efficiency
 const short MAP_SIZE = 10; //currently one variable for size - a square map
 const short map[MAP_SIZE][MAP_SIZE]={{1,1,1,1,1,1,1,1,1,1},
                                      {1,0,0,0,0,0,0,0,0,1},
+                                     {1,0,0,1,1,1,1,1,0,1},
                                      {1,0,0,0,0,0,0,0,0,1},
-                                     {1,0,0,0,0,0,0,0,0,1},
-                                     {1,0,0,0,0,0,0,0,0,1},
+                                     {1,0,0,0,1,1,1,0,1,1},
                                      {1,0,0,0,0,0,0,0,0,1},
                                      {1,0,0,0,0,0,0,0,0,1},
                                      {1,0,0,0,0,0,0,0,0,1},
@@ -111,7 +112,7 @@ void flash(DigitalOut LED, short dir){
     LED= false;
 
     short DelayCount = ping(dir);
-    if (DelayCount>0){ 
+    if (DelayCount>0 && DelayCount <=5){ 
         thread_sleep_for(dist_delay * DelayCount);
         LED = true;
         thread_sleep_for(dist_delay);     //ping LED again
@@ -130,32 +131,35 @@ void flash(DigitalOut LED, short dir){
     (at the moment it will only print how many spaces away the nearest wall is in each direction and doesn't return anything)
 */
 void ping_all(){
+    //indicate the sonar has started
+    // scanLED=true;    
     //fow
-    lcd.locate(0,0);
-    lcd.printf("f:%i",  ping(0));
+    // lcd.locate(6,0);
+    // lcd.printf("f:%i",  ping(0));
     flash(fowLED, 0);
 
     thread_sleep_for(ping_delay);
 
     //left
-    lcd.locate(8,0);
-    lcd.printf("r:%i", ping(1));
+    // lcd.locate(11,1);
+    // lcd.printf("r:%i", ping(1));
     flash(leftLED, 1);
     
     thread_sleep_for(ping_delay);
     
     //back
-    lcd.locate(0,1);
-    lcd.printf("b:%i", ping(2));
+    // lcd.locate(6,1);
+    // lcd.printf("b:%i", ping(2));
     flash(backLED, 2);
     
     thread_sleep_for(ping_delay);
     
     //right
-    lcd.locate(8,1);
-    lcd.printf("l: %i", ping(3));
+    // lcd.locate(1,1);
+    // lcd.printf("l:%i", ping(3));
     flash(righLED, 3);
 
+    // scanLED=false;
 }
 //------------------------------------------------------MOVEMENT FUNCTIONS------------------------------------------------------//
 
@@ -186,16 +190,16 @@ void crash(){
 void go_fowards(){
     //if not a wall in front of me
     //position[0]+-1 OR position[1] +- 1 depending on direction
-    printf("position (%i,%i)",position[0], position[1]);
+    // printf("position (%i,%i)",position[0], position[1]);
     if(orientation==0){ //if moving east
         if(map[position[1]][position[0]+1]==1){ //if next space is a wall 
             crash();
         }
         else{
             position[0]++;
-            lcd.cls();
-            lcd.locate(0,0);
-            lcd.printf("fowards.");
+            // lcd.cls();               debugging lines display distances to walls
+            // lcd.locate(0,0);
+            // lcd.printf("fowards.");
         }
     }
     if(orientation==1){ //if moving south
@@ -204,9 +208,9 @@ void go_fowards(){
         }
         else{
             position[1]++;
-            lcd.cls();
-            lcd.locate(0,0);
-            lcd.printf("fowards.");
+            // lcd.cls();
+            // lcd.locate(0,0);
+            // lcd.printf("fowards.");
         }
     }
     if(orientation==2){ //if moving west
@@ -215,9 +219,9 @@ void go_fowards(){
         }
         else{ 
             position[0]--;
-            lcd.cls();
-            lcd.locate(0,0);
-            lcd.printf("fowards.");
+            // lcd.cls();
+            // lcd.locate(0,0);
+            // lcd.printf("fowards.");
         }
     }
     if(orientation==3){ //if moving north
@@ -226,13 +230,24 @@ void go_fowards(){
         }
         else{
             position[1]--;
-            lcd.cls();
-            lcd.locate(0,0);
-            lcd.printf("fowards.");
+            // lcd.cls();
+            // lcd.locate(0,0);
+            // lcd.printf("fowards.");
         }
     }
+    lcd.cls();
 }
 
+/* rotate
+    rotate the ship by an angle where, for example, -1 would be 90* left, 1 would be 90* right, and 2 would be 180* right
+*/
+void rotate(short angle){
+    short newOrien = orientation + angle;
+    while(newOrien>3) newOrien-=4;
+    while(newOrien<0) newOrien+=4;  //normalise the orientation between 0 and 3
+    
+    orientation = newOrien;
+}
 //-------------------------------------------------------------MAIN-------------------------------------------------------------//
 
 int main(){
@@ -243,12 +258,25 @@ int main(){
     while(true){
         if(pingButton == false){    //on press
             lcd.cls();
+            lcd.locate(0,0);
+            lcd.printf("  sonar active  ");
             ping_all();
+            lcd.cls();
         }
-        if(moveButton == false){    //on press
+        if(moveButton == false){ 
+            lcd.cls();
+            lcd.locate(0,0);
+            lcd.printf("    moving ^    ");
             thread_sleep_for(ping_delay);
             go_fowards();
-
+        }
+        if(rotateButton == false){  //rotate 90* right on press
+            lcd.cls();
+            lcd.locate(0,0);
+            lcd.printf("   rotated ->   ");
+            thread_sleep_for(ping_delay);
+            rotate(1);
+            lcd.cls();
         }
     }
 }
