@@ -4,45 +4,47 @@
 //------------------------------------------------VARIABLES------------------------------------------------//
 
 TextLCD lcd(D0, D1, D2, D3, D4, D5, TextLCD::LCD20x4); // Connect these nucleo pins to RS, E, D4, D5, D6 and D7 pins of the LCD
-DigitalOut fowLED(D6), leftLED(D7), righLED(D8), backLED(D9);
-DigitalIn pingButton(D10);
+DigitalOut fowLED(D6), leftLED(D8), righLED(D7), backLED(D9);
+DigitalIn pingButton(D10, PullUp);
+
 //using shorts for memory efficiency
 const short MAP_SIZE = 10; //currently one variable for size - a square map
 const short map[MAP_SIZE][MAP_SIZE]={{1,1,1,1,1,1,1,1,1,1},
-                                    {1,0,0,0,0,0,0,0,0,1},
-                                    {1,0,0,0,0,0,0,0,0,1},
-                                    {1,0,0,0,0,0,0,0,0,1},
-                                    {1,0,0,0,0,0,0,0,0,1},
-                                    {1,0,0,0,0,0,0,0,0,1},
-                                    {1,0,0,0,0,0,0,0,0,1},
-                                    {1,0,0,0,0,0,0,0,0,1},
-                                    {1,0,0,0,0,0,0,0,0,1},
-                                    {1,1,1,1,1,1,1,1,1,1}}; //0-empty, 1-wall
+                                     {1,0,0,0,0,0,0,0,0,1},
+                                     {1,0,0,0,0,0,0,0,0,1},
+                                     {1,0,0,0,0,0,0,0,0,1},
+                                     {1,0,0,0,0,0,0,0,0,1},
+                                     {1,0,0,0,0,0,0,0,0,1},
+                                     {1,0,0,0,0,0,0,0,0,1},
+                                     {1,0,0,0,0,0,0,0,0,1},
+                                     {1,0,0,0,0,0,0,0,0,1},
+                                     {1,1,1,1,1,1,1,1,1,1}}; //0-empty, 1-wall
 short orientation = 0; //0-E, 1-S, 2-W, 3-N
-short sonar_orien = 0;
-short position[] = {2,2}; //easier to have position as its own variable instead of storing in map
-short ping_delay=500;
-short dist_delay=200;
+short position[] = {2,3}; //position on map in form {x,y}
+
+short ping_delay=500;   //the delay between pinging each direction
+short dist_delay=200;   //the delay for every empty space between you and a wall
 
 //------------------------------------------------FUNCTIONS------------------------------------------------//
 
-/* ping_fow
+/* ping
     Send out a ping and light up LEDs if there is a wall detected in foward direction
 
     returns the distance of nearest wall (-1 if there is none)
 */
 short ping(short sonar_orien){
     
+    short max_dist;
     short wall_dist = 1; //initialising how far away the closest wall is (1=right next to player)
     
-    short direction = sonar_orien+orientation;
-    if (direction>3) direction-=4;  //coincidentally adding up the two always gives the number for direction
+    short direction = sonar_orien+orientation; //coincidentally adding up the two always gives the absolute number for direction
+    if (direction>3) direction-=4;              //when reduced to a value within 0-3
 
     if(direction == 0){ //if east
-        short max_dist = MAP_SIZE - position[1]; //the distance to scan through
+        max_dist = MAP_SIZE - position[1]; //the distance to scan through
 
         for(int i=1; i<=max_dist; i++){
-            if (map[position[0]][position[1]+i] == 1){
+            if (map[position[1]][position[0]+i] == 1){
                 //there is a wall, return its distance
                 return wall_dist;
             }
@@ -54,10 +56,10 @@ short ping(short sonar_orien){
     }
     else if(direction == 1) //if south
     {
-        short max_dist = MAP_SIZE - position[0];
+        max_dist = MAP_SIZE - position[1];
 
         for(int i=1; i<=max_dist; i++){
-            if (map[position[0]+i][position[1]] == 1){
+            if (map[position[1]+i][position[0]] == 1){
                 //there is a wall, return its distance
                 return wall_dist;
             }
@@ -66,22 +68,22 @@ short ping(short sonar_orien){
     }
     else if(direction == 2) //if west
     {
-        short max_dist = position[1]-1;
+        max_dist = position[0];
 
         for(int i=1; i<=max_dist; i++){
-            if (map[position[0]][position[1]-i] == 1){
+            if (map[position[1]][position[0]-i] == 1){
                 //there is a wall, return its distance
                 return wall_dist;
             }
             else wall_dist+=1;
     }
     }
-    else if(direction == 1) //if north
+    else if(direction == 3) //if north
     {
-        short max_dist = position[0] - 1;
+        max_dist = position[1];
 
         for(int i=1; i<=max_dist; i++){
-            if (map[position[0]-i][position[1]] == 1){
+            if (map[position[1]-i][position[0]] == 1){
                 //there is a wall, return its distance
                 return wall_dist;
             }
@@ -89,6 +91,7 @@ short ping(short sonar_orien){
         }
     }
     //if there was no wall detected
+    printf("NO WALL: dir:%i, walldist:%i, maxdist:%i\r\n", direction, wall_dist, max_dist);
     return -1;
 }
 
@@ -105,17 +108,23 @@ void flash(DigitalOut LED, short dir){
     LED= false;
 
     short DelayCount = ping(dir);
-    if (DelayCount>0) thread_sleep_for(dist_delay * DelayCount);
-    else printf("NO WALL");
+    if (DelayCount>0){ 
+        thread_sleep_for(dist_delay * DelayCount);
+        LED = true;
+        thread_sleep_for(dist_delay);     //ping LED again
+        LED= false;
+    }
+    else {
+        // printf("NO WALL");
+        thread_sleep_for(ping_delay);
+    }
 
-    LED = true;
-    thread_sleep_for(dist_delay);     //ping LED again
-    LED= false;
+    
 }
 
 /* ping_all
     pings in every direction clockwise starting from foward
-    (at the moment it will only print hqow many spaces away the nearest wall is in each direction and doesn't return anything)
+    (at the moment it will only print how many spaces away the nearest wall is in each direction and doesn't return anything)
 */
 void ping_all(){
     //fow
@@ -127,7 +136,7 @@ void ping_all(){
 
     //left
     lcd.locate(8,0);
-    lcd.printf("l:%i", ping(1));
+    lcd.printf("r:%i", ping(1));
     flash(leftLED, 1);
     
     thread_sleep_for(ping_delay);
@@ -141,7 +150,7 @@ void ping_all(){
     
     //right
     lcd.locate(8,1);
-    lcd.printf("r: %i", ping(3));
+    lcd.printf("l: %i", ping(3));
     flash(righLED, 3);
 
 }
@@ -156,7 +165,7 @@ int main()
     // lcd.printf("Hello World!\n"); //displays the message Hello World on the LCD
 
     while(true){
-        if(pingButton == true){
+        if(pingButton == false){    //on press
             ping_all();
         }
 
