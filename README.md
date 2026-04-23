@@ -13,7 +13,7 @@ Features:
   - progress
   - position relative to start
   - compass
-- randon initioal position
+- random initial position
 
 Yet to include:
 - Rotation (via rotary encoder)
