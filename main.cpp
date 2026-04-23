@@ -8,27 +8,36 @@ DigitalOut fowLED(D6), leftLED(D8), righLED(D7), backLED(D9); //scanLED(D12);
 DigitalIn pingButton(D10, PullUp);
 DigitalIn moveButton(D11, PullUp);
 DigitalIn rotateButton(D12, PullUp);
+AnalogIn rndPin(A5);    //pin to measure noise
+AnalogOut A_0(A0), A_1(A1), A_2(A2), A_3(A3);
 
 //----------------------------------------------------------VARIABLES----------------------------------------------------------//
 //using shorts for memory efficiency
-const short MAP_SIZE = 10; //currently one variable for size - a square map
-const short map[MAP_SIZE][MAP_SIZE]={{1,1,1,1,1,1,1,1,1,1},
-                                     {1,0,0,0,0,0,0,0,0,1},
-                                     {1,0,0,1,1,1,1,1,0,1},
-                                     {1,0,0,0,0,0,0,0,0,1},
-                                     {1,0,0,0,1,1,1,0,1,1},
-                                     {1,0,0,0,0,0,0,0,0,1},
-                                     {1,0,0,0,0,0,0,0,0,1},
-                                     {1,0,0,0,0,0,0,0,0,1},
-                                     {1,0,0,0,0,0,0,0,0,1},
-                                     {1,1,1,1,1,1,1,1,1,1}}; //0-empty, 1-wall
+const short MAP_X = 20; //How wide the map is
+const short MAP_Y = 10; //How long the map is
+const short map[MAP_Y][MAP_X]= {{1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+                                {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+                                {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+                                {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+                                {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+                                {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+                                {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+                                {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+                                {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+                                {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}}; //0-empty, 1-wall, 2-treasure
 short orientation = 0; //0-E, 1-S, 2-W, 3-N
-short position[] = {2,3}; //position on map in form {x,y}
+short position[] = {1,1}; //position on map in form {x,y}
+short start_pos[] = {0,0};
+short relative_pos[] = {0,0}; //position relative to start
 
 short ping_delay=500;   //the delay between pinging each direction
 short dist_delay=200;   //the delay for every empty space between you and a wall
 
 short lives=2;  //how many lives player has
+
+short numProgLEDs = 4;
+const short TOTAL_TREASURE = numProgLEDs*2; //idk
+short FoundTreasure = 0;
 
 //-------------------------------------------------------SONAR FUNCTIONS-------------------------------------------------------//
 
@@ -46,7 +55,7 @@ short ping(short sonar_orien){
     if (direction>3) direction-=4;              //when reduced to a value within 0-3
 
     if(direction == 0){ //if east
-        max_dist = MAP_SIZE - position[1]; //the distance to scan through
+        max_dist = MAP_X - position[1]; //the distance to scan through
 
         for(int i=1; i<=max_dist; i++){
             if (map[position[1]][position[0]+i] == 1){
@@ -61,7 +70,7 @@ short ping(short sonar_orien){
     }
     else if(direction == 1) //if south
     {
-        max_dist = MAP_SIZE - position[1];
+        max_dist = MAP_Y - position[1];
 
         for(int i=1; i<=max_dist; i++){
             if (map[position[1]+i][position[0]] == 1){
@@ -119,7 +128,6 @@ void flash(DigitalOut LED, short dir){
         LED= false;
     }
     else {
-        // printf("NO WALL");
         thread_sleep_for(ping_delay);
     }
 
@@ -132,34 +140,20 @@ void flash(DigitalOut LED, short dir){
 */
 void ping_all(){
     //indicate the sonar has started
-    // scanLED=true;    
     //fow
-    // lcd.locate(6,0);
-    // lcd.printf("f:%i",  ping(0));
     flash(fowLED, 0);
-
     thread_sleep_for(ping_delay);
 
     //left
-    // lcd.locate(11,1);
-    // lcd.printf("r:%i", ping(1));
     flash(leftLED, 1);
-    
     thread_sleep_for(ping_delay);
     
     //back
-    // lcd.locate(6,1);
-    // lcd.printf("b:%i", ping(2));
     flash(backLED, 2);
-    
     thread_sleep_for(ping_delay);
     
     //right
-    // lcd.locate(1,1);
-    // lcd.printf("l:%i", ping(3));
     flash(righLED, 3);
-
-    // scanLED=false;
 }
 //------------------------------------------------------MOVEMENT FUNCTIONS------------------------------------------------------//
 
@@ -181,6 +175,8 @@ void crash(){
         lcd.printf("Ship Destroyed.");
         while(true);
     }
+    thread_sleep_for(ping_delay);
+    lcd.cls();
 }
 
 /* go_fowards()
@@ -190,16 +186,12 @@ void crash(){
 void go_fowards(){
     //if not a wall in front of me
     //position[0]+-1 OR position[1] +- 1 depending on direction
-    // printf("position (%i,%i)",position[0], position[1]);
     if(orientation==0){ //if moving east
         if(map[position[1]][position[0]+1]==1){ //if next space is a wall 
             crash();
         }
         else{
             position[0]++;
-            // lcd.cls();               debugging lines display distances to walls
-            // lcd.locate(0,0);
-            // lcd.printf("fowards.");
         }
     }
     if(orientation==1){ //if moving south
@@ -208,9 +200,6 @@ void go_fowards(){
         }
         else{
             position[1]++;
-            // lcd.cls();
-            // lcd.locate(0,0);
-            // lcd.printf("fowards.");
         }
     }
     if(orientation==2){ //if moving west
@@ -219,9 +208,6 @@ void go_fowards(){
         }
         else{ 
             position[0]--;
-            // lcd.cls();
-            // lcd.locate(0,0);
-            // lcd.printf("fowards.");
         }
     }
     if(orientation==3){ //if moving north
@@ -230,9 +216,6 @@ void go_fowards(){
         }
         else{
             position[1]--;
-            // lcd.cls();
-            // lcd.locate(0,0);
-            // lcd.printf("fowards.");
         }
     }
     lcd.cls();
@@ -248,35 +231,142 @@ void rotate(short angle){
     
     orientation = newOrien;
 }
+//---------------------------------------------------------MAP FUNCTIONS---------------------------------------------------------//
+//generate a random number (credit to Rohan Kakade)
+unsigned short random_generator(){
+    unsigned short x = 0;
+    unsigned short iRandom = 0;
+
+    for (x = 0; x <= 32; x = x+ 2) {
+        iRandom = iRandom + ((rndPin.read_u16() % 3) << x); // "<< x" rotates the value in yellow brackets by x bits to the left
+        thread_sleep_for (10);
+    }
+    return iRandom; //return random value
+}
+
+void rnd_position() {
+    short posX, posY;
+
+    do {
+        posX = random_generator() % (MAP_X - 2) + 1;
+        posY = random_generator() % (MAP_Y - 2) + 1;    //limit random number within map range
+    } while (map[posY][posX] != 0);
+
+    position[0] = posX;
+    position[1] = posY;
+    start_pos[0]= posX;
+    start_pos[1]= posY;
+}
+
+
+void updateProgLEDs();
+
+bool isTreasure(){
+    if (map[position[1]][position[0]] == 2){
+        FoundTreasure+=1;
+        updateProgLEDs();
+        return true;
+    }
+    else return false;
+}
+
+
+//-----------------------------------------------------------TELEMETRY----------------------------------------------------------//
+
+void updateProgLEDs(){
+    float toLight = (float(FoundTreasure)/TOTAL_TREASURE)*numProgLEDs;        //no. LEDs to Light
+    if (toLight>=1) A_0=1;
+    if (toLight>=2) A_1=1;
+    if (toLight>=3){
+        A_2=1;
+        A_3 = (numProgLEDs-toLight);    //e.g. if 3.5 out of 4 then A_3=0.5
+    }
+    // if (FoundTreasure==TOTAL_TREASURE) win();
+     
+                //e.g. for 6 total treasure on 3 leds, having found
+                //5 you would see 2 fully lit and 1 half lit LEDs
+                //if you had all 6, i==toLight and you win
+}
+
+//compass - we already have start_pos from randomPos(), and pos=start_pos;
+//if direction change detected call updateDirTelem()
+void updateCompTelem(){
+    //clear compass on LCD
+    lcd.locate(0,0);
+    lcd.printf("  ");
+    lcd.locate(0,1);        
+    lcd.printf("  ");
+
+    if(orientation==0)     {lcd.locate(0,0);
+                            lcd.printf(" →"); }
+    else if(orientation==1) lcd.printf(" ↓");
+    else if(orientation==2) lcd.printf("← ");
+    else if(orientation==3){lcd.locate(0,0);
+                            lcd.printf("↑ "); }
+}
+
+//pos relative to start
+//if space change detected (relative pos starts at (0,0))
+void updatePosTelem(){
+    relative_pos[0] = position[0]-start_pos[0];
+    relative_pos[1] = position[1]-start_pos[1];
+    lcd.locate(3,0);
+    lcd.printf("(%i,%i)",relative_pos[0],relative_pos[1]);
+}
+
+//Movement feedback
+void movementTelem(){
+    //telemetry animation
+    lcd.locate(15,1);   //bottom right arrow
+    lcd.printf("↑");
+    thread_sleep_for(100);
+    lcd.printf(" ");
+    lcd.locate(15,0);
+    lcd.printf("↑");    //arrow shift up
+    thread_sleep_for(100);
+    lcd.printf(" ");
+    lcd.locate(15,1);
+    lcd.printf("↑");    //arrow shifts back down
+    thread_sleep_for(100);
+    lcd.printf(" ");    //arrow disappears
+}
+
+//rotation feedback
+void rotateTelem(char dir){ //where dir is an arrow char (← or →)
+    lcd.locate(15,1);
+    lcd.printf("↑");
+    thread_sleep_for(100);
+    lcd.printf("%c",dir);
+    thread_sleep_for(100);
+    lcd.printf("↑");
+    thread_sleep_for(100);
+    lcd.printf(" ");
+}
+
+//progress - displayed as a fraction out of total
+void updateProgTelem(){
+    lcd.locate(3,1);    //bottom middle
+    lcd.printf("%i/%i", FoundTreasure, TOTAL_TREASURE);
+}
+
 //-------------------------------------------------------------MAIN-------------------------------------------------------------//
 
 int main(){
     lcd.cls(); //clears the lcd screen
     lcd.locate(0,0); //sets the cursor to column 0 and row 1
-    // lcd.printf("Hello World!\n"); //displays the message Hello World on the LCD
-
+    rnd_position();
+    
     while(true){
         if(pingButton == false){    //on press
-            lcd.cls();
-            lcd.locate(0,0);
-            lcd.printf("  sonar active  ");
             ping_all();
-            lcd.cls();
         }
         if(moveButton == false){ 
-            lcd.cls();
-            lcd.locate(0,0);
-            lcd.printf("    moving ^    ");
             thread_sleep_for(ping_delay);
             go_fowards();
         }
         if(rotateButton == false){  //rotate 90* right on press
-            lcd.cls();
-            lcd.locate(0,0);
-            lcd.printf("   rotated ->   ");
             thread_sleep_for(ping_delay);
             rotate(1);
-            lcd.cls();
         }
     }
 }
