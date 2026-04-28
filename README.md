@@ -1,9 +1,9 @@
 Features:
 - Map array
 - sonar pings
-- LED flashes in accordance to pings
+- LED flashes in accordance with pings
 - LCD output of basic info
-- Foward movement
+- Forward movement
 - crashing
 - lives and end-of-game condition
 - Rotation (via one button)
@@ -14,11 +14,12 @@ Features:
   - position relative to start
   - compass
 - random initial position
+- Rotation (via rotary encoder)
+
 
 Yet to include:
-- Rotation (via rotary encoder)
 - bigger map
-- portals
+- portals (got skeleton - need to inegrated without definition)
 - mini-games
 - menu
 - PD outputs
