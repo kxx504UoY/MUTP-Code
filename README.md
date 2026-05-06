@@ -15,11 +15,11 @@ Features:
   - compass
 - random initial position
 - Rotation (via rotary encoder)
+- menu
 
 
 Yet to include:
 - bigger map
 - portals (got skeleton - need to inegrated without definition)
 - mini-games
-- menu
 - PD outputs
