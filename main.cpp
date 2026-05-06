@@ -41,6 +41,8 @@
     short numProgLEDs = 4;
     const short TOTAL_TREASURE = numProgLEDs*2; //current implementation 8 treasures
     short FoundTreasure = 0;
+    
+    bool minigamesActive = false;
 
 //---------------------------------------------------------DECLARATIONS--------------------------------------------------------//
     short ping(short sonar_orien);
@@ -67,13 +69,15 @@
     void refreshOSD();
     // void updateProgLEDs();  
 
-    void win();
+    void winScreen();
     // bool paused();
+    void pauseScreen();
+    void startMenu();
 
 //-------------------------------------------------------------MAIN------------------------------------------------------------//
 
     int main(){
-        // startMenu();
+        startMenu();
 
         rnd_position();
         refreshOSD();
@@ -436,7 +440,7 @@
         relative_pos[0] = position[0]-start_pos[0];
         relative_pos[1] = position[1]-start_pos[1];
         lcd.locate(3,0);
-        lcd.printf("(%i,%i)",relative_pos[0],relative_pos[1]);
+        lcd.printf("(%i,%i)",relative_pos[0],-relative_pos[1]);
     }
 
 
@@ -486,7 +490,7 @@
         lcd.locate(3,1);    //bottom middle
         lcd.printf("%i/%i", FoundTreasure, TOTAL_TREASURE);
         // updateProgLEDs();
-        if(FoundTreasure==TOTAL_TREASURE) win();
+        if(FoundTreasure==TOTAL_TREASURE) winScreen();
     }
 
     void refreshOSD(){
@@ -526,15 +530,43 @@
         while(true);
     }
 
-    // void pauseScreen(){
-    //     lcd.cls();
-    //     lcd.locate(0,0);
-    //     lcd.printf("    PAUSED...   "); 
-    //     lcd.locate(0,1);
-    //     lcd.printf("play: push lever");
-    // }
+    void pauseScreen(){
+        lcd.cls();
+        lcd.locate(0,0);
+        lcd.printf("    PAUSED...   "); 
+        lcd.locate(0,1);
+        lcd.printf("play: push lever");
+    }
 
-    // void startScreen(){
-    //     lcd.locate(0,0);
-    //     lcd.printf("");
-    // }
+    void startMenu(){
+        lcd.locate(0,0);
+        lcd.printf("Minigames:   off");
+        lcd.locate(0,1);
+        lcd.printf("Lives:%i  go:move", lives);
+
+        do{
+            if(pingButton==false){
+                lcd.locate(13,0);
+
+                if(minigamesActive){
+                    lcd.printf("off");
+                    minigamesActive=false;
+                }
+                else{
+                    lcd.printf(" on");
+                    minigamesActive=true;
+                }
+                thread_sleep_for(200);
+            }
+
+            if(encoderRotated()){
+                lcd.locate(6,1);
+
+                if(rotatedCW() && lives<9)         lcd.printf("%i",++lives);
+                else if(!rotatedCW() && lives>1)    lcd.printf("%i", --lives);
+                
+                thread_sleep_for(200);
+            }
+
+        }while(moveButton==true);        
+    }
