@@ -9,15 +9,16 @@
     DigitalIn pingButton(D10, PullUp);
     DigitalIn moveButton(D11, PullUp);
     DigitalIn rotateButton(D12, PullUp);
-    AnalogIn rndPin(A0);    //pin to measure noise
-    AnalogOut A_0(A1), A_1(A1), A_2(A2), A_3(A3);       //NEED TO FIX FUNC!!!!
-    DigitalIn  RotEncCLK(A4), RotEncDT(A5);        //for scanning rotary encoder
-
+    
+    AnalogIn rndPin(PA_0);    // A0 to measure noise
+    // AnalogOut A_1(PA_1), A_2(PA_4), A_3(PB_1);       //NEED TO FIX FUNC!!!!
+    DigitalIn  RotEncCLK(PB_1), RotEncDT(PB_12);        // for scanning rotary encoder
+    // DigitalIn pauseSwitch(PD_9);    //bottom right pin to switch
 //----------------------------------------------------------VARIABLES----------------------------------------------------------//
     //using shorts for memory efficiency
     const short MAP_X = 20; //How wide the map is
     const short MAP_Y = 10; //How long the map is
-    short map[MAP_Y][MAP_X]= {{1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+    short map[MAP_Y][MAP_X]=       {{1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
                                     {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
                                     {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
                                     {1,0,0,0,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,1},
@@ -55,23 +56,31 @@
     unsigned short random_generator();
     void rnd_position();
     bool isTreasure();
+    bool isPortal();
     void teleport();
 
     void progOSD();
     void moveOSD();
     void rotateOSD(bool CW);
+    void bordersOSD();
     bool isTreasure();
-    void updateProgLEDs();  
+    void refreshOSD();
+    // void updateProgLEDs();  
+
+    void win();
+    // bool paused();
 
 //-------------------------------------------------------------MAIN------------------------------------------------------------//
 
     int main(){
-        lcd.cls(); //clears the lcd screen
-        lcd.locate(0,0); //sets the cursor to column 0 and row 1
+        // startMenu();
+
         rnd_position();
-        
+        refreshOSD();
         //top-level loop
         while(true){
+            // lcd.cls();
+            // lcd.printf("Get looped idiot");
             if(pingButton == false){    //on press
                 ping_all();
 
@@ -87,6 +96,15 @@
 
                 thread_sleep_for(ping_delay);
             }
+            // else if(paused()){
+            //     lcd.cls();
+            //     lcd.locate(0,0);
+            //     lcd.printf("Paused");
+            //     while(paused()) /*do nothing*/;
+            //     lcd.cls();
+            //     thread_sleep_for(ping_delay);
+
+            // }
         }
     }
 
@@ -225,7 +243,7 @@
             while(true);
         }
         thread_sleep_for(ping_delay);
-        lcd.cls();
+        refreshOSD();
     }
 
     /* go_fowards()
@@ -241,6 +259,7 @@
             }
             else{
                 position[0]++;
+                moveOSD();    //update movement info
             }
         }
         else if(orientation==1){ //if moving south
@@ -249,6 +268,7 @@
             }
             else{
                 position[1]++;
+                moveOSD();    //update movement info
             }
         }
         else if(orientation==2){ //if moving west
@@ -257,6 +277,7 @@
             }
             else{ 
                 position[0]--;
+                moveOSD();    //update movement info
             }
         }
         else if(orientation==3){ //if moving north
@@ -265,6 +286,7 @@
             }
             else{
                 position[1]--;
+                moveOSD();    //update movement info
             }
         }
         
@@ -272,9 +294,9 @@
             progOSD();    //update progress info
             map[position[1]][position[0]] = 0;  //remove treasure one collected
         }
-        else if(isPortal) teleport();
+        else if(isPortal()) teleport();
 
-        moveOSD();    //update movement info
+        
     }
 
     /* rotate
@@ -292,7 +314,7 @@
     }
 
     bool encoderRotated(){
-        if (RotEncCLK==true) return true;
+        if (RotEncCLK==false) return true;
         else                return false;
     }
 
@@ -333,6 +355,8 @@
         position[1] = posY;
         start_pos[0]= posX;
         start_pos[1]= posY;
+
+        orientation = random_generator() % 4;
     }
 
 
@@ -343,7 +367,7 @@
     bool isTreasure(){
         if (map[position[1]][position[0]] == 2){
             FoundTreasure+=1;
-            updateProgLEDs();
+            // updateProgLEDs();
             return true;
         }
         else return false;
@@ -371,20 +395,19 @@
     /* updateProgLEDs
         updates the progress LED outputs according to the percentage progress of the user
     */
-    void updateProgLEDs(){
-        float toLight = (float(FoundTreasure)/TOTAL_TREASURE)*numProgLEDs;        //no. LEDs to Light
-        if (toLight>=1) A_0=1;
-        if (toLight>=2) A_1=1;
-        if (toLight>=3){
-            A_2=1;
-            A_3 = (numProgLEDs-toLight);    //e.g. if 3.5 out of 4 then A_3=0.5
-        }
-        // if (FoundTreasure==TOTAL_TREASURE) win();
+    // void updateProgLEDs(){
+    //     float toLight = (float(FoundTreasure)/TOTAL_TREASURE)*numProgLEDs;        //no. LEDs to Light
+    //     if (toLight>=1) A_1=1;
+    //     if (toLight>=2){
+    //         A_2=1;
+    //         A_3 = (numProgLEDs-toLight);    //e.g. if 2.5 out of 3 then A_3=0.5
+    //     }
+    //     // if (FoundTreasure==TOTAL_TREASURE) win();
         
-                    //e.g. for 6 total treasure on 3 leds, having found
-                    //5 you would see 2 fully lit and 1 half lit LEDs
-                    //if you had all 6, i==toLight and you win
-    }
+    //                 //e.g. for 6 total treasure on 3 leds, having found
+    //                 //5 you would see 2 fully lit and 1 half lit LEDs
+    //                 //if you had all 6, i==toLight and you win
+    // }
 
     //absolute compass (relative to map) 
     void updateCompOSD(){
@@ -394,12 +417,17 @@
         lcd.locate(0,1);        
         lcd.printf("  ");
 
-        if(orientation==0)     {lcd.locate(0,0);
-                                lcd.printf(" →"); }
-        else if(orientation==1) lcd.printf(" ↓");
-        else if(orientation==2) lcd.printf("← ");
+        if(orientation==0)     {lcd.locate(1,0);
+                                lcd.printf("r");}
+
+        else if(orientation==1){lcd.locate(1,1);
+                                lcd.printf("d");}
+
+        else if(orientation==2){lcd.locate(0,1);
+                                lcd.printf("l");}
+                                
         else if(orientation==3){lcd.locate(0,0);
-                                lcd.printf("↑ "); }
+                                lcd.printf("u");}
     }
 
     //pos relative to start
@@ -418,16 +446,19 @@
     void moveOSD(){
         //telemetry animation
         lcd.locate(15,1);   //bottom right arrow
-        lcd.printf("↑");
-        thread_sleep_for(100);
+        lcd.printf("u");
+        thread_sleep_for(200);
+        lcd.locate(15,1);
         lcd.printf(" ");
         lcd.locate(15,0);
-        lcd.printf("↑");    //arrow shift up
-        thread_sleep_for(100);
+        lcd.printf("u");    //arrow shift up
+        thread_sleep_for(200);
+        lcd.locate(15,0);
         lcd.printf(" ");
         lcd.locate(15,1);
-        lcd.printf("↑");    //arrow shifts back down
-        thread_sleep_for(100);
+        lcd.printf("u");    //arrow shifts back down
+        thread_sleep_for(200);
+        lcd.locate(15,1);
         lcd.printf(" ");    //arrow disappears
         updatePosOSD();
     }
@@ -435,12 +466,17 @@
     //rotation feedback (calls updateCompTelem)
     void rotateOSD(bool CW){ //where dir is an arrow char (← or →)
         lcd.locate(15,1);
-        lcd.printf("↑");
-        thread_sleep_for(100);
-        lcd.printf("%c",dir);
-        thread_sleep_for(100);
-        lcd.printf("↑");
-        thread_sleep_for(100);
+        lcd.printf("u");
+        thread_sleep_for(200);
+        lcd.locate(15,1);
+        if(CW) lcd.printf("r");
+        else   lcd.printf("l");
+
+        thread_sleep_for(200);
+        lcd.locate(15,1);
+        lcd.printf("u");
+        thread_sleep_for(200);
+        lcd.locate(15,1);
         lcd.printf(" ");
         updateCompOSD();
     }
@@ -449,7 +485,56 @@
     void progOSD(){
         lcd.locate(3,1);    //bottom middle
         lcd.printf("%i/%i", FoundTreasure, TOTAL_TREASURE);
-        updateProgLEDs();
+        // updateProgLEDs();
+        if(FoundTreasure==TOTAL_TREASURE) win();
     }
 
-//
+    void refreshOSD(){
+        lcd.cls();
+        bordersOSD();
+        progOSD();
+        updateCompOSD();
+        updatePosOSD();
+    }
+
+    /* bordersOSD
+        print the on screen seperating borders that make the information on screen more formatted and neat
+    */
+    void bordersOSD(){
+        lcd.locate(2,0);
+        lcd.printf("|");
+        lcd.locate(2,1);
+        lcd.printf("|");
+        lcd.locate(14,0);
+        lcd.printf("|");
+        lcd.locate(14,1);
+        lcd.printf("|");
+    }
+
+//------------------------------------------------------------PAGES------------------------------------------------------------//
+    // bool paused(){
+    //     if(pauseSwitch) return true;
+    //     else return false;
+    // }
+
+    void winScreen(){
+        lcd.cls();
+        lcd.locate(0,0);
+        lcd.printf("CONGRATULATIONS!");
+        lcd.locate(0,1);
+        lcd.printf("Found all gold!");
+        while(true);
+    }
+
+    // void pauseScreen(){
+    //     lcd.cls();
+    //     lcd.locate(0,0);
+    //     lcd.printf("    PAUSED...   "); 
+    //     lcd.locate(0,1);
+    //     lcd.printf("play: push lever");
+    // }
+
+    // void startScreen(){
+    //     lcd.locate(0,0);
+    //     lcd.printf("");
+    // }
